@@ -563,8 +563,7 @@ var CropprCore = function () {
     this._restore = {
       parent: element.parentNode,
       element: element
-    };
-    if (!deferred) {
+    };if (!deferred) {
       if (element.width === 0 || element.height === 0) {
         element.onload = function () {
           _this.initialize(element);
@@ -579,6 +578,9 @@ var CropprCore = function () {
     value: function initialize(element) {
       this.createDOM(element);
       this.options.convertToPixels(this.cropperEl);
+      var container = this.cropperEl.getBoundingClientRect();
+      this._scaleFactorX = this.cropperEl.offsetWidth / container.width;
+      this._scaleFactorY = this.cropperEl.offsetHeight / container.height;
       this.attachHandlerEvents();
       this.attachRegionEvents();
       this.attachOverlayEvents();
@@ -653,18 +655,17 @@ var CropprCore = function () {
   }, {
     key: 'initializeBox',
     value: function initializeBox(opts) {
-      var width = opts.startSize.width;
-      var height = opts.startSize.height;
+      var width = opts.startSize.width * (1 / this._scaleFactorX);
+      var height = opts.startSize.height * (1 / this._scaleFactorY);
       var box = new Box(0, 0, width, height);
       box.constrainToRatio(opts.aspectRatio, [0.5, 0.5]);
       var min = opts.minSize;
       var max = opts.maxSize;
       box.constrainToSize(max.width, max.height, min.width, min.height, [0.5, 0.5], opts.aspectRatio);
-      var parentWidth = this.cropperEl.offsetWidth;
-      var parentHeight = this.cropperEl.offsetHeight;
-      box.constrainToBoundary(parentWidth, parentHeight, [0.5, 0.5]);
-      var x = this.cropperEl.offsetWidth / 2 - box.width() / 2;
-      var y = this.cropperEl.offsetHeight / 2 - box.height() / 2;
+      var container = this.cropperEl.getBoundingClientRect();
+      box.constrainToBoundary(container.width, container.height, [0.5, 0.5]);
+      var x = container.width / 2 - box.width() / 2;
+      var y = container.height / 2 - box.height() / 2;
       box.move(x, y);
       return box;
     }
@@ -672,12 +673,12 @@ var CropprCore = function () {
     key: 'redraw',
     value: function redraw() {
       var _this3 = this;
-      var width = Math.round(this.box.width()),
-          height = Math.round(this.box.height()),
-          x1 = Math.round(this.box.x1),
-          y1 = Math.round(this.box.y1),
-          x2 = Math.round(this.box.x2),
-          y2 = Math.round(this.box.y2);
+      var width = Math.round(this.box.width() * this._scaleFactorX),
+          height = Math.round(this.box.height() * this._scaleFactorY),
+          x1 = Math.round(this.box.x1 * this._scaleFactorX),
+          y1 = Math.round(this.box.y1 * this._scaleFactorY),
+          x2 = Math.round(this.box.x2 * this._scaleFactorX),
+          y2 = Math.round(this.box.y2 * this._scaleFactorY);
       window.requestAnimationFrame(function () {
         _this3.regionEl.style.transform = 'translate(' + x1 + 'px, ' + y1 + 'px)';
         _this3.regionEl.style.width = width + 'px';
@@ -787,8 +788,8 @@ var CropprCore = function () {
           _box$getAbsolutePoint2 = slicedToArray(_box$getAbsolutePoint, 2),
           originX = _box$getAbsolutePoint2[0],
           originY = _box$getAbsolutePoint2[1];
-      this.activeHandle = { handle: handle, originPoint: originPoint, originX: originX, originY: originY };
-      if (this.options.onCropStart !== null) {
+      this.activeHandle = { handle: handle, originPoint: originPoint, originX: originX, originY: originY
+      };if (this.options.onCropStart !== null) {
         this.options.onCropStart(this.getValue());
       }
     }
@@ -859,9 +860,7 @@ var CropprCore = function () {
       var min = this.options.minSize;
       var max = this.options.maxSize;
       box.constrainToSize(max.width, max.height, min.width, min.height, origin, this.options.aspectRatio);
-      var parentWidth = this.cropperEl.offsetWidth;
-      var parentHeight = this.cropperEl.offsetHeight;
-      box.constrainToBoundary(parentWidth, parentHeight, origin);
+      box.constrainToBoundary(container.width, container.height, origin);
       this.box = box;
       this.redraw();
       if (this.options.onCropMove !== null) {
@@ -887,8 +886,7 @@ var CropprCore = function () {
       this.currentMove = {
         offsetX: mouseX - this.box.x1,
         offsetY: mouseY - this.box.y1
-      };
-      if (this.options.onCropStart !== null) {
+      };if (this.options.onCropStart !== null) {
         this.options.onCropStart(this.getValue());
       }
     }
@@ -982,8 +980,7 @@ var CropprCore = function () {
         onCropStart: null,
         onCropMove: null,
         onCropEnd: null
-      };
-      var aspectRatio = null;
+      };var aspectRatio = null;
       if (opts.aspectRatio !== undefined) {
         if (typeof opts.aspectRatio === 'number') {
           aspectRatio = opts.aspectRatio;
@@ -1180,9 +1177,43 @@ var Croppr$1 = function (_CropprCore) {
       }
       return this;
     }
+  }, {
+    key: 'getDataImage',
+    value: function getDataImage(extension, cb) {
+      var img = new Image();
+      var value = this.getValue();
+      var canvas = document.createElement('canvas');
+      canvas.width = value.width;
+      canvas.height = value.height;
+      var ctx = canvas.getContext('2d');
+      img.setAttribute('crossOrigin', 'anonymous');
+      img.onload = function () {
+        ctx.drawImage(img, -value.x, -value.y);
+        var cropImage = canvas.toDataURL(extension || 'image/jpeg');
+        var blob = dataURLtoBlob(cropImage);
+        if (typeof cb === 'function' && cropImage) {
+          cb(cropImage, blob);
+        }
+        canvas.remove();
+        img.remove();
+      };
+      img.src = this.imageEl.src;
+      return this;
+    }
   }]);
   return Croppr;
 }(CropprCore);
+function dataURLtoBlob(dataurl) {
+  var arr = dataurl.split(','),
+      mime = arr[0].match(/:(.*?);/)[1],
+      bstr = atob(arr[1]),
+      n = bstr.length,
+      u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
 return Croppr$1;
 
