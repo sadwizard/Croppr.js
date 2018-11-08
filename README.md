@@ -220,7 +220,7 @@ Scales the crop region by a factor. `origin` is an optional argument that specif
 
 Resets the crop region to its original position and size. Returns the Croppr instance.
 
-#### getDataImage()
+#### getDataImage(extension: string || default 'image/jpeg', callback: func(cropedImgAsBase64, Blob))
 
 Get cropped source image in format blob
 
